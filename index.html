@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#071426">
+<meta name="description" content="Colonnello dêc: previsioni, radar, analisi e meteo Italia.">
+<title>Colonnello dêc Meteo</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{color-scheme:dark;--bg:#071426;--panel:#10243b;--panel2:#0c1c30;--blue:#27a8f4;--text:#f3f8ff;--muted:#9db9d2}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+header{display:flex;align-items:center;gap:12px;padding:14px 16px;background:linear-gradient(130deg,#092f57,#061222);position:sticky;top:0;z-index:20;border-bottom:1px solid #1b3b5c}
+header img{width:54px;height:54px;object-fit:contain;border-radius:50%;border:1px solid #5fcaff}
+.brand{font-weight:900;letter-spacing:.4px;font-size:18px}.brand span{color:#58c9ff}.sub{font-size:10px;color:#a7c7e2;letter-spacing:1.2px;margin-top:2px}
+main{max-width:1000px;margin:auto;padding:14px 14px 90px}
+nav{display:flex;gap:8px;overflow:auto;margin:4px 0 14px;scrollbar-width:none}
+nav button,.action{background:#102742;color:#d7ecff;border:1px solid #294d6f;border-radius:12px;padding:10px 13px;white-space:nowrap;font-size:12px}
+nav button.active{background:#087bc1;border-color:#44c5ff;color:white}
+.page{display:none}.page.active{display:block}
+.card{background:linear-gradient(140deg,#143c64,#0b1b32);border:1px solid #244b70;border-radius:17px;padding:16px;margin-bottom:12px}
+.cityrow{display:flex;justify-content:space-between;align-items:center;gap:10px}
+select{background:#0c2743;color:#d8efff;border:1px solid #345c7b;border-radius:9px;padding:8px}
+.temp{font-size:45px;font-weight:850;margin:8px 0}.condition{font-size:14px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.stat{background:#091b30;border:1px solid #1c3c5a;border-radius:12px;padding:10px;font-size:11px;color:#abc6df}.stat b{display:block;color:white;font-size:15px;margin-top:5px}
+h2{font-size:16px;margin:17px 0 10px}.days{display:flex;gap:8px;overflow:auto}.day{min-width:84px;text-align:center;background:var(--panel);border-radius:12px;padding:10px;font-size:11px}.day strong{display:block;font-size:15px;margin:7px 0}
+#map{height:min(68vh,600px);min-height:350px;border-radius:15px;overflow:hidden;border:1px solid #2c5278}
+.map-controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.info{background:#122a44;border:1px solid #244766;border-radius:12px;padding:12px;font-size:12px;color:#c5d9eb;margin:10px 0;line-height:1.5}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px}
+.tile{background:var(--panel);border:1px solid #203c5a;border-radius:13px;padding:13px}
+.tile strong{display:block;margin:6px 0}.muted{color:var(--muted);font-size:12px}
+footer{text-align:center;color:#7897b4;font-size:10px;padding:20px}
+@media(min-width:720px){main{padding:20px}header{padding-left:max(16px,calc((100vw - 1000px)/2))}}
+</style>
+</head>
+<body>
+<header><img src="logo.png" alt="Logo Colonnello dêc"><div><div class="brand">COLONNELLO <span>DÊC</span></div><div class="sub">METEO · ANALISI · PREVISIONI</div></div></header>
+<main>
+<nav aria-label="Navigazione"><button class="active" data-page="home">🏠 Home</button><button data-page="radar">🛰️ Radar</button><button data-page="italia">🇮🇹 Italia</button><button data-page="avvisi">🚨 Avvisi</button><button data-page="analisi">🔭 Analisi</button></nav>
+<section id="home" class="page active">
+<div class="card">
+<div class="cityrow"><label for="city">📍 Località</label><select id="city"><option value="44.5,11.34,Bologna">Bologna</option><option value="44.59,11.05,Castelfranco Emilia">Castelfranco Emilia</option><option value="42.5,12.5,Italia">Italia (centrale)</option><option value="45.46,9.19,Milano">Milano</option><option value="41.9,12.5,Roma">Roma</option><option value="40.85,14.27,Napoli">Napoli</option><option value="45.07,7.69,Torino">Torino</option><option value="38.12,13.36,Palermo">Palermo</option><option value="39.22,9.12,Cagliari">Cagliari</option></select></div>
+<div id="temperature" class="temp">--°C</div><div id="condition" class="condition">Caricamento condizioni attuali…</div>
+<div class="stats"><div class="stat">💧 Umidità<b id="humidity">--</b></div><div class="stat">💨 Vento<b id="wind">--</b></div><div class="stat">🌧️ Pioggia<b id="rain">--</b></div></div>
+</div>
+<h2>Previsioni 5 giorni</h2><div id="forecast" class="days"><div class="day">Caricamento…</div></div>
+<div class="info">Dati previsionali forniti da Open-Meteo. Questa app è un progetto indipendente e non sostituisce gli avvisi ufficiali.</div>
+</section>
+<section id="radar" class="page">
+<h2>Radar precipitazioni live</h2><div class="map-controls"><button class="action" id="showRadar">🌧️ Radar</button><button class="action" id="hideRadar">🗺️ Solo mappa</button><button class="action" id="refreshRadar">↻ Aggiorna radar</button><button class="action" id="locate">◎ La mia posizione</button></div>
+<div id="map"></div><div id="radarInfo" class="muted" style="margin-top:8px">Il radar si carica quando apri la sezione.</div>
+<div class="info">Radar RainViewer con animazione temporale non inclusa in questa versione; il layer mostra l'ultima scansione disponibile. Cartografia © OpenStreetMap.</div>
+</section>
+<section id="italia" class="page">
+<h2>Previsioni per località</h2><p class="muted">Scegli una città nella schermata Home per aggiornare i dati. Selezioni disponibili:</p>
+<div class="grid"><div class="tile">🏔️ <strong>Nord</strong><span class="muted">Alpi, pianure e Liguria</span></div><div class="tile">🌦️ <strong>Centro</strong><span class="muted">Tirreno e Adriatico</span></div><div class="tile">☀️ <strong>Sud</strong><span class="muted">Sud peninsulare</span></div><div class="tile">🌊 <strong>Isole</strong><span class="muted">Sicilia e Sardegna</span></div></div>
+</section>
+<section id="avvisi" class="page">
+<h2>Avvisi meteo</h2><div class="info">Questa build non è collegata a un feed ufficiale di allerte e non invia notifiche push in background. Controlla sempre i canali della Protezione Civile e delle autorità regionali.</div>
+<div class="grid"><div class="tile">⛈️ <strong>Temporali</strong><span class="muted">Fulmini, grandine e nubifragi</span></div><div class="tile">💨 <strong>Vento forte</strong><span class="muted">Raffiche e burrasche</span></div><div class="tile">❄️ <strong>Neve e gelo</strong><span class="muted">Quota neve e accumuli</span></div><div class="tile">🌊 <strong>Mareggiate</strong><span class="muted">Condizioni marine</span></div></div>
+</section>
+<section id="analisi" class="page">
+<h2>Analisi Colonnello dêc</h2><div class="tile"><strong>Modelli meteorologici</strong><p class="muted">Confronta gli scenari previsionali e segui le tendenze.</p><a href="https://www.wetterzentrale.de/" target="_blank" rel="noopener">Apri mappe modelli (Wetterzentrale)</a></div>
+<div class="tile" style="margin-top:10px"><strong>ECMWF</strong><p class="muted">Modello europeo.</p><a href="https://charts.ecmwf.int/" target="_blank" rel="noopener">Mappe ECMWF</a></div>
+<div class="tile" style="margin-top:10px"><strong>GFS</strong><p class="muted">Modello americano.</p><a href="https://www.weather.gov/" target="_blank" rel="noopener">Portale meteo NOAA</a></div>
+</section>
+<footer>Colonnello dêc · App meteo indipendente · Fonti: Open-Meteo, RainViewer, OpenStreetMap</footer>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+function describe(code){if(code===0)return"Sereno";if([1,2,3].includes(code))return"Nuvolosità variabile";if([45,48].includes(code))return"Nebbia";if(code>=51&&code<=67)return"Pioggia o pioviggine";if(code>=71&&code<=77)return"Neve";if(code>=80&&code<=82)return"Rovesci";if(code>=85&&code<=86)return"Rovesci nevosi";if(code>=95)return"Temporali";return"Condizioni variabili"}
+async function weather(){
+const [lat,lon,name]=$("city").value.split(",");
+$("condition").textContent="Aggiornamento…";
+try{const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=5`;
+const d=await fetch(url).then(r=>r.json());const c=d.current;
+$("temperature").textContent=Math.round(c.temperature_2m)+"°C";$("condition").textContent=describe(c.weather_code)+" · "+name;
+$("humidity").textContent=c.relative_humidity_2m+"%";$("wind").textContent=c.wind_speed_10m+" km/h";$("rain").textContent=c.precipitation+" mm";
+$("forecast").innerHTML=d.daily.time.map((date,i)=>`<div class="day">${new Date(date+"T12:00:00").toLocaleDateString("it-IT",{weekday:"short"})}<br>${describe(d.daily.weather_code[i])}<strong>${Math.round(d.daily.temperature_2m_max[i])}°</strong><span class="muted">${Math.round(d.daily.temperature_2m_min[i])}° min</span></div>`).join("");
+}catch(e){$("condition").textContent="Dati momentaneamente non disponibili"}}
+let map,radar;
+function initMap(){map=L.map("map").setView([42.5,12.5],5);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(map);loadRadar();}
+async function loadRadar(){try{const j=await fetch("https://api.rainviewer.com/public/weather-maps.json").then(r=>r.json());const frame=j.radar.past.at(-1);if(radar)map.removeLayer(radar);radar=L.tileLayer(`${j.host}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`,{opacity:.68,maxNativeZoom:7,maxZoom:12}).addTo(map);$("radarInfo").textContent="Ultima scansione radar disponibile: "+new Date(frame.time*1000).toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"})+" · RainViewer";}catch(e){$("radarInfo").textContent="Radar temporaneamente non disponibile."}}
+$("showRadar").onclick=loadRadar;$("hideRadar").onclick=()=>radar&&map.removeLayer(radar);$("refreshRadar").onclick=loadRadar;
+$("locate").onclick=()=>{if(!navigator.geolocation)return alert("Geolocalizzazione non disponibile");navigator.geolocation.getCurrentPosition(p=>map.setView([p.coords.latitude,p.coords.longitude],8),()=>alert("Permesso posizione negato o non disponibile"))};
+$("city").onchange=weather;
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));$(b.dataset.page).classList.add("active");if(b.dataset.page==="radar"){if(!map)initMap();setTimeout(()=>map.invalidateSize(),100)}});
+weather();
+if("serviceWorker"in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});
+</script>
+</body></html>

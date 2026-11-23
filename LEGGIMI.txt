@@ -1,0 +1,5 @@
+Colonnello dêc Meteo - progetto PWA.
+Carica i file contenuti in questa cartella nella radice del repository GitHub (non lo ZIP).
+Per pubblicare sul web, abilita GitHub Pages da Settings > Pages.
+Questa non è ancora una app Android AAB/APK per Play Store.
+Logo temporaneo sostituibile con il logo definitivo.
