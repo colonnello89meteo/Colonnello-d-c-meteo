@@ -23,6 +23,7 @@ nav button.active{background:#087bc1;border-color:#44c5ff;color:white}
 .card{background:linear-gradient(140deg,#143c64,#0b1b32);border:1px solid #244b70;border-radius:17px;padding:16px;margin-bottom:12px}
 .cityrow{display:flex;justify-content:space-between;align-items:center;gap:10px}
 select{background:#0c2743;color:#d8efff;border:1px solid #345c7b;border-radius:9px;padding:8px}
+.searchwrap{position:relative;margin:12px 0 8px}.searchwrap input{width:100%;padding:13px 14px;border-radius:11px;border:1px solid #345c7b;background:#0c2743;color:#fff;font-size:16px}.results{position:absolute;top:100%;left:0;right:0;z-index:30;max-height:260px;overflow:auto;background:#10243b;border:1px solid #47769b;border-radius:10px;box-shadow:0 8px 25px #0009}.results button{display:block;width:100%;padding:12px;text-align:left;background:transparent;color:white;border:0;border-bottom:1px solid #294560;font-size:14px}.results button:focus,.results button:hover{background:#17466a}.results .msg{padding:12px;font-size:13px;color:#c5d9eb}
 .temp{font-size:45px;font-weight:850;margin:8px 0}.condition{font-size:14px}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
 .stat{background:#091b30;border:1px solid #1c3c5a;border-radius:12px;padding:10px;font-size:11px;color:#abc6df}.stat b{display:block;color:white;font-size:15px;margin-top:5px}
@@ -43,7 +44,8 @@ footer{text-align:center;color:#7897b4;font-size:10px;padding:20px}
 <nav aria-label="Navigazione"><button class="active" data-page="home">🏠 Home</button><button data-page="radar">🛰️ Radar</button><button data-page="italia">🇮🇹 Italia</button><button data-page="avvisi">🚨 Avvisi</button><button data-page="analisi">🔭 Analisi</button></nav>
 <section id="home" class="page active">
 <div class="card">
-<div class="cityrow"><label for="city">📍 Località</label><select id="city"><option value="44.5,11.34,Bologna">Bologna</option><option value="44.59,11.05,Castelfranco Emilia">Castelfranco Emilia</option><option value="42.5,12.5,Italia">Italia (centrale)</option><option value="45.46,9.19,Milano">Milano</option><option value="41.9,12.5,Roma">Roma</option><option value="40.85,14.27,Napoli">Napoli</option><option value="45.07,7.69,Torino">Torino</option><option value="38.12,13.36,Palermo">Palermo</option><option value="39.22,9.12,Cagliari">Cagliari</option></select></div>
+<div class="cityrow"><label for="citySearch">📍 Cerca località italiana</label></div>
+<div class="searchwrap"><input id="citySearch" type="search" autocomplete="off" placeholder="Es. Verona, Roma, Cortina..." aria-label="Cerca una località in Italia" aria-controls="cityResults" aria-expanded="false"><div id="cityResults" class="results" role="listbox" hidden></div></div><div id="selectedCity" class="muted" aria-live="polite">Località selezionata: Bologna</div>
 <div id="temperature" class="temp">--°C</div><div id="condition" class="condition">Caricamento condizioni attuali…</div>
 <div class="stats"><div class="stat">💧 Umidità<b id="humidity">--</b></div><div class="stat">💨 Vento<b id="wind">--</b></div><div class="stat">🌧️ Pioggia<b id="rain">--</b></div></div>
 </div>
@@ -56,7 +58,7 @@ footer{text-align:center;color:#7897b4;font-size:10px;padding:20px}
 <div class="info">Radar RainViewer con animazione temporale non inclusa in questa versione; il layer mostra l'ultima scansione disponibile. Cartografia © OpenStreetMap.</div>
 </section>
 <section id="italia" class="page">
-<h2>Previsioni per località</h2><p class="muted">Scegli una città nella schermata Home per aggiornare i dati. Selezioni disponibili:</p>
+<h2>Previsioni per località</h2><p class="muted">Cerca una località italiana nella schermata Home per aggiornare i dati. A seconda della copertura geografica, possono essere disponibili comuni e frazioni:</p>
 <div class="grid"><div class="tile">🏔️ <strong>Nord</strong><span class="muted">Alpi, pianure e Liguria</span></div><div class="tile">🌦️ <strong>Centro</strong><span class="muted">Tirreno e Adriatico</span></div><div class="tile">☀️ <strong>Sud</strong><span class="muted">Sud peninsulare</span></div><div class="tile">🌊 <strong>Isole</strong><span class="muted">Sicilia e Sardegna</span></div></div>
 </section>
 <section id="avvisi" class="page">
@@ -75,7 +77,7 @@ footer{text-align:center;color:#7897b4;font-size:10px;padding:20px}
 const $=id=>document.getElementById(id);
 function describe(code){if(code===0)return"Sereno";if([1,2,3].includes(code))return"Nuvolosità variabile";if([45,48].includes(code))return"Nebbia";if(code>=51&&code<=67)return"Pioggia o pioviggine";if(code>=71&&code<=77)return"Neve";if(code>=80&&code<=82)return"Rovesci";if(code>=85&&code<=86)return"Rovesci nevosi";if(code>=95)return"Temporali";return"Condizioni variabili"}
 async function weather(){
-const [lat,lon,name]=$("city").value.split(",");
+const {lat,lon,name}=selectedLocation;
 $("condition").textContent="Aggiornamento…";
 try{const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=5`;
 const d=await fetch(url).then(r=>r.json());const c=d.current;
@@ -88,7 +90,35 @@ function initMap(){map=L.map("map").setView([42.5,12.5],5);L.tileLayer("https://
 async function loadRadar(){try{const j=await fetch("https://api.rainviewer.com/public/weather-maps.json").then(r=>r.json());const frame=j.radar.past.at(-1);if(radar)map.removeLayer(radar);radar=L.tileLayer(`${j.host}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`,{opacity:.68,maxNativeZoom:7,maxZoom:12}).addTo(map);$("radarInfo").textContent="Ultima scansione radar disponibile: "+new Date(frame.time*1000).toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"})+" · RainViewer";}catch(e){$("radarInfo").textContent="Radar temporaneamente non disponibile."}}
 $("showRadar").onclick=loadRadar;$("hideRadar").onclick=()=>radar&&map.removeLayer(radar);$("refreshRadar").onclick=loadRadar;
 $("locate").onclick=()=>{if(!navigator.geolocation)return alert("Geolocalizzazione non disponibile");navigator.geolocation.getCurrentPosition(p=>map.setView([p.coords.latitude,p.coords.longitude],8),()=>alert("Permesso posizione negato o non disponibile"))};
-$("city").onchange=weather;
+let selectedLocation={lat:44.4949,lon:11.3426,name:"Bologna"};
+const searchInput=$("citySearch"), searchResults=$("cityResults");
+let searchTimer=0,searchSequence=0;
+function hideResults(){searchResults.hidden=true;searchInput.setAttribute("aria-expanded","false")}
+function showMessage(message){searchResults.replaceChildren();const item=document.createElement("div");item.className="msg";item.textContent=message;searchResults.append(item);searchResults.hidden=false;searchInput.setAttribute("aria-expanded","true")}
+searchInput.addEventListener("input",()=>{
+  clearTimeout(searchTimer);const q=searchInput.value.trim();const seq=++searchSequence;
+  if(q.length<2){hideResults();return}
+  showMessage("Ricerca in corso…");
+  searchTimer=setTimeout(async()=>{
+    try{
+      const url="https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(q)+"&count=30&language=it&format=json&countryCode=IT";
+      const response=await fetch(url);if(!response.ok)throw Error("geocoding");
+      const data=await response.json();if(seq!==searchSequence)return;
+      const places=(data.results||[]).filter(x=>x.country_code==="IT");
+      searchResults.replaceChildren();
+      if(!places.length){showMessage("Nessuna località trovata. Prova un nome vicino o più completo.");return}
+      for(const place of places){
+        const btn=document.createElement("button");btn.type="button";btn.setAttribute("role","option");
+        btn.textContent=[place.name,place.admin3,place.admin2,place.admin1].filter(Boolean).filter((x,i,a)=>a.indexOf(x)===i).join(" · ");
+        btn.addEventListener("click",()=>{selectedLocation={lat:place.latitude,lon:place.longitude,name:place.name};searchInput.value=place.name;$("selectedCity").textContent="Località selezionata: "+btn.textContent;hideResults();weather()});
+        searchResults.append(btn);
+      }
+      searchResults.hidden=false;searchInput.setAttribute("aria-expanded","true");
+    }catch(e){if(seq===searchSequence)showMessage("Ricerca non disponibile. Controlla la connessione.")}
+  },350);
+});
+searchInput.addEventListener("keydown",e=>{if(e.key==="Escape")hideResults()});
+document.addEventListener("click",e=>{if(!e.target.closest(".searchwrap"))hideResults()});
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));$(b.dataset.page).classList.add("active");if(b.dataset.page==="radar"){if(!map)initMap();setTimeout(()=>map.invalidateSize(),100)}});
 weather();
 if("serviceWorker"in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});
