@@ -63,17 +63,87 @@ footer{text-align:center;color:#7897b4;font-size:10px;padding:20px}
 const $=id=>document.getElementById(id);
 function icon(code){if(code===0)return '☀️';if(code===1||code===2)return '🌤️';if(code===3)return '☁️';if(code===45||code===48)return '🌫️';if((code>=71&&code<=77)||code===85||code===86)return '🌨️';if(code>=95)return '⛈️';if(code>=80&&code<=82)return '🌦️';if(code>=51&&code<=67)return '🌧️';return '☁️'}
 function describe(code){if(code===0)return"Sereno";if([1,2,3].includes(code))return"Nuvolosità variabile";if([45,48].includes(code))return"Nebbia";if(code>=51&&code<=67)return"Pioggia o pioviggine";if(code>=71&&code<=77)return"Neve";if(code>=80&&code<=82)return"Rovesci";if(code>=85&&code<=86)return"Rovesci nevosi";if(code>=95)return"Temporali";return"Condizioni variabili"}
+
 async function weather(){
 const [lat,lon,name]=$("city").value.split(",");
 $("condition").textContent="Aggiornamento…";
-try{const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=5`;
-const d=await fetch(url).then(r=>r.json());const c=d.current;
-$("temperature").textContent=Math.round(c.temperature_2m)+"°C";$("condition").textContent=describe(c.weather_code)+" · "+name;
-$("humidity").textContent=c.relative_humidity_2m+"%";$("wind").textContent=c.wind_speed_10m+" km/h";$("rain").textContent=c.precipitation+" mm";
-$("forecast").innerHTML=d.daily.time.map((date,i)=>`<div class="day">${new Date(date+"T12:00:00").toLocaleDateString("it-IT",{weekday:"short"})}<span class="weatherIcon">${icon(d.daily.weather_code[i])}</span>${describe(d.daily.weather_code[i])}<strong>${Math.round(d.daily.temperature_2m_max[i])}°</strong><span class="muted">${Math.round(d.daily.temperature_2m_min[i])}° min</span><span class="prob">💧 ${d.daily.precipitation_probability_max?.[i] == null ? "—" : d.daily.precipitation_probability_max[i]+"%"}</span></div>`).join("");
-}catch(e){$("condition").textContent="Dati momentaneamente non disponibili"}}
+try{
+const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&hourly=temperature_2m,weather_code,rain,showers,snowfall,is_day&timezone=auto&forecast_days=5`;
+const response=await fetch(url);
+
+if(!response.ok)throw new Error("Meteo");
+const d=await response.json();
+if($("city").value!==[lat,lon,name].join(","))return;
+const c=d.current;
+$("temperature").textContent=Math.round(c.temperature_2m)+"°C";
+$("condition").textContent=describe(c.weather_code)+" · "+name;
+$("humidity").textContent=c.relative_humidity_2m+"%";
+$("wind").textContent=c.wind_speed_10m+" km/h";
+$("rain").textContent=c.precipitation+" mm";
+
+$("forecast").style.display="block";
+$("forecast").innerHTML=d.daily.time.map((date,i)=>{
+const h=d.hourly;
+const rows=h.time.map((t,j)=>{
+if(!t.startsWith(date+"T"))return "";
+const code=h.weather_code[j];
+const symbol=h.is_day[j]===0&&code<=1?"🌙":icon(code);
+const rain=h.rain[j]==null||h.showers[j]==null?"—":(h.rain[j]+h.showers[j]).toFixed(1);
+const snow=h.snowfall[j]==null?"—":h.snowfall[j].toFixed(1);
+return `<tr style="border-bottom:1px solid #345c7b">
+<td style="padding:10px 4px">${t.slice(11,16)}</td>
+<td title="${describe(code)}" style="font-size:24px">${symbol}</td>
+<td>${h.temperature_2m[j]==null?"—":Math.round(h.temperature_2m[j])+"°"}</td>
+<td>${rain} mm</td>
+<td>${snow} cm</td>
+</tr>`;
+}).join("");
+
+return `<details style="background:#102742;border:1px solid #345c7b;border-radius:12px;margin:8px 0;padding:12px">
+<summary style="cursor:pointer;font-size:15px;font-weight:bold">
+${new Date(date+"T12:00:00").toLocaleDateString("it-IT",{weekday:"long",day:"numeric",month:"short"})}
+${icon(d.daily.weather_code[i])}
+${Math.round(d.daily.temperature_2m_min[i])}° / ${Math.round(d.daily.temperature_2m_max[i])}°
+</summary>
+<table style="width:100%;text-align:center;border-collapse:collapse;font-size:12px;margin-top:12px">
+<thead><tr><th>Ora</th><th>Meteo</th><th>Temp.</th><th>🌧️ mm</th><th>❄️ cm</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</details>`;
+}).join("");
+}catch(e){
+$("condition").textContent="Dati momentaneamente non disponibili";
+$("forecast").textContent="Previsioni non disponibili";
+}
+}
 let timer,searchSeq=0;
-$("searchCity").addEventListener("input",()=>{clearTimeout(timer);const seq=++searchSeq;const q=$("searchCity").value.trim();$("results").replaceChildren();if(q.length<2)return;timer=setTimeout(async()=>{try{const r=await fetch("https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(q)+"&count=20&language=it&format=json");if(!r.ok)throw Error();const d=await r.json();if(seq!==searchSeq)return;for(const place of d.results||[]){const b=document.createElement("button");const label=[place.name,place.admin1,place.country].filter(Boolean).join(" · ");b.textContent=label;b.onclick=()=>{++searchSeq;$("city").value=[place.latitude,place.longitude,label.replaceAll(","," ")].join(",");$("searchCity").value=place.name;$("results").replaceChildren();weather();};$("results").append(b)}if(!d.results?.length)$("results").textContent="Nessuna località trovata";}catch(e){if(seq===searchSeq)$("results").textContent="Ricerca temporaneamente non disponibile";}},350)});
+$("searchCity").addEventListener("input",()=>{
+clearTimeout(timer);
+const seq=++searchSeq;
+const q=$("searchCity").value.trim();
+$("results").replaceChildren();
+if(q.length<2)return;
+timer=setTimeout(async()=>{
+try{
+const r=await fetch("https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(q)+"&count=10&language=it&format=json");
+const d=await r.json();
+if(seq!==searchSeq)return;
+(d.results||[]).forEach(c=>{
+const b=document.createElement("button");
+b.textContent=[c.name,c.admin1,c.country].filter(Boolean).join(" · ");
+b.onclick=()=>{
+searchSeq++;
+$("city").value=[c.latitude,c.longitude,c.name.replaceAll(","," ")].join(",");
+$("searchCity").value=c.name;
+$("results").replaceChildren();
+weather();
+};
+$("results").appendChild(b);
+});
+}catch(e){}
+},400);
+});
+
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));$(b.dataset.page).classList.add("active");});
 
 weather();
