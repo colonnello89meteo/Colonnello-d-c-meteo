@@ -75,7 +75,56 @@ $("forecast").innerHTML=d.daily.time.map((date,i)=>`<div class="day">${new Date(
 let timer,searchSeq=0;
 $("searchCity").addEventListener("input",()=>{clearTimeout(timer);const seq=++searchSeq;const q=$("searchCity").value.trim();$("results").replaceChildren();if(q.length<2)return;timer=setTimeout(async()=>{try{const r=await fetch("https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(q)+"&count=20&language=it&format=json");if(!r.ok)throw Error();const d=await r.json();if(seq!==searchSeq)return;for(const place of d.results||[]){const b=document.createElement("button");const label=[place.name,place.admin1,place.country].filter(Boolean).join(" · ");b.textContent=label;b.onclick=()=>{++searchSeq;$("city").value=[place.latitude,place.longitude,label.replaceAll(","," ")].join(",");$("searchCity").value=place.name;$("results").replaceChildren();weather();};$("results").append(b)}if(!d.results?.length)$("results").textContent="Nessuna località trovata";}catch(e){if(seq===searchSeq)$("results").textContent="Ricerca temporaneamente non disponibile";}},350)});
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));$(b.dataset.page).classList.add("active");});
+
 weather();
+
+async function attivaGPS() {
+  if (!navigator.geolocation) return;
+
+  const seq = searchSeq;
+
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      let nome = "La tua posizione";
+
+      try {
+        const r = await fetch(
+          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=it`
+        );
+        const d = await r.json();
+        nome = d.city || d.locality || nome;
+      } catch (e) {}
+
+      if (seq !== searchSeq) return;
+
+      $("city").value = [
+        lat, lon, nome.replaceAll(",", " ")
+      ].join(",");
+
+      $("searchCity").value = nome;
+      $("results").textContent = "";
+      weather();
+    },
+    () => {},
+    {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 60000
+    }
+  );
+}
+
+const gpsButton = document.createElement("button");
+gpsButton.type = "button";
+gpsButton.className = "action";
+gpsButton.textContent = "📍 Usa la mia posizione";
+gpsButton.onclick = attivaGPS;
+$("searchCity").after(gpsButton);
+
+attivaGPS();
+
 if("serviceWorker"in navigator)navigator.serviceWorker.register("./sw.js?v=3").catch(()=>{});
 </script>
 <script type="module">
